@@ -35,7 +35,7 @@ RUN pip install --upgrade pip && \
     if [ -f src/repository/requirements.txt ]; then \
         pip install -r src/repository/requirements.txt; \
     fi && \
-    pip install coverage xml-to-junit-xml
+    pip install coverage
 
 # Build
 RUN . /opt/ros/humble/setup.sh && \
