@@ -4,11 +4,11 @@ This repository follows a structured development workflow.
 
 ## ✅ Status & Compatibility
 
-**Replace `YOUR_GITHUB_USERNAME` and `REPO_NAME` below with your GitHub details**
+**CI badges are configured for this organization repository.**
 
-[![CI - Python](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml)
-[![CI - Linting](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml)
-[![CI - ROS](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/YOUR_GITHUB_USERNAME/REPO_NAME/actions/workflows/ci.yml)
+[![CI - Python](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![CI - Linting](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![CI - ROS](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
 
 | Status | Details |
 |--------|---------|
