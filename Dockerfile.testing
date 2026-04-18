@@ -48,25 +48,4 @@ RUN . /opt/ros/humble/setup.sh && \
 # Run tests with coverage and reports
 RUN mkdir -p /test-results
 
-CMD ["/bin/bash", "-c", "\
-    source /opt/ros/humble/setup.bash && \
-    source ${WORKSPACE}/install/setup.bash && \
-    \
-    echo '=== Running ROS Tests ===' && \
-    colcon test \
-    --event-handlers console_direct+ \
-    --return-code-on-test-failure \
-    2>&1 | tee /test-results/colcon-test.log && \
-    \
-    echo '=== Test Results ===' && \
-    colcon test-result --verbose 2>&1 | tee /test-results/test-results.txt && \
-    \
-    echo '=== Running Python Unit Tests ===' && \
-    find ${WORKSPACE}/src -name 'test_*.py' -o -name '*_test.py' | \
-    xargs pytest -v --tb=short --cov=${WORKSPACE}/src/repository --cov-report=xml:/test-results/coverage.xml 2>&1 | tee /test-results/pytest.log && \
-    \
-    echo '=== Running Code Quality Checks ===' && \
-    ament_flake8 ${WORKSPACE}/src/repository 2>&1 | tee /test-results/flake8.log || true && \
-    \
-    echo '=== All Tests Complete ===' && \
-    echo 'Test reports available in /test-results/'"
+CMD ["/bin/bash", "-lc", "source /opt/ros/${ROS_DISTRO}/setup.bash && source ${WORKSPACE}/install/setup.bash && echo '=== Running ROS Tests ===' && colcon test --event-handlers console_direct+ --return-code-on-test-failure 2>&1 | tee /test-results/colcon-test.log && echo '=== Test Results ===' && colcon test-result --verbose 2>&1 | tee /test-results/test-results.txt && echo '=== Running Python Unit Tests ===' && find ${WORKSPACE}/src -name 'test_*.py' -o -name '*_test.py' | xargs pytest -v --tb=short --cov=${WORKSPACE}/src/repository --cov-report=xml:/test-results/coverage.xml 2>&1 | tee /test-results/pytest.log && echo '=== Running Code Quality Checks ===' && ament_flake8 ${WORKSPACE}/src/repository 2>&1 | tee /test-results/flake8.log || true && echo '=== All Tests Complete ===' && echo 'Test reports available in /test-results/'"]
