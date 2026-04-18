@@ -1,0 +1,10 @@
+# Code Owners - Auto-assign PR reviewers
+# More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owner - will be requested for review on every PR
+* @your-github-username
+
+# You can also assign specific folder owners:
+# /src @src-owner
+# /tests @test-owner
+# /docs @docs-owner

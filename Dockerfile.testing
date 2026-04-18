@@ -1,0 +1,72 @@
+# Testing-specific Dockerfile for CI/CD
+# Optimized for running tests and generating reports
+
+ARG ROS_DISTRO=humble
+FROM ros:${ROS_DISTRO}
+
+ENV WORKSPACE=/home/ros/ws
+ENV DEBIAN_FRONTEND=noninteractive
+ARG ROS_DISTRO
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-pytest \
+    python3-pytest-cov \
+    python3-pytest-xdist \
+    ros-${ROS_DISTRO}-ament-flake8 \
+    ros-${ROS_DISTRO}-ament-black \
+    ros-${ROS_DISTRO}-ament-mypy \
+    ros-${ROS_DISTRO}-ament-pep257 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p ${WORKSPACE}/src
+WORKDIR ${WORKSPACE}
+
+# Copy repo
+COPY . src/repository
+
+# Install dependencies
+RUN rosdep update && \
+    rosdep install --from-paths src --ignore-src -r -y || true
+
+RUN pip install --upgrade pip && \
+    if [ -f src/repository/requirements.txt ]; then \
+        pip install -r src/repository/requirements.txt; \
+    fi && \
+    pip install coverage xml-to-junit-xml
+
+# Build
+RUN . /opt/ros/humble/setup.sh && \
+    colcon build \
+    --symlink-install \
+    --event-handlers console_direct+ \
+    --parallel-workers 4 \
+    2>&1 | tee build.log
+
+# Run tests with coverage and reports
+RUN mkdir -p /test-results
+
+CMD ["/bin/bash", "-c", "\
+    source /opt/ros/humble/setup.bash && \
+    source ${WORKSPACE}/install/setup.bash && \
+    \
+    echo '=== Running ROS Tests ===' && \
+    colcon test \
+    --event-handlers console_direct+ \
+    --return-code-on-test-failure \
+    2>&1 | tee /test-results/colcon-test.log && \
+    \
+    echo '=== Test Results ===' && \
+    colcon test-result --verbose 2>&1 | tee /test-results/test-results.txt && \
+    \
+    echo '=== Running Python Unit Tests ===' && \
+    find ${WORKSPACE}/src -name 'test_*.py' -o -name '*_test.py' | \
+    xargs pytest -v --tb=short --cov=${WORKSPACE}/src/repository --cov-report=xml:/test-results/coverage.xml 2>&1 | tee /test-results/pytest.log && \
+    \
+    echo '=== Running Code Quality Checks ===' && \
+    ament_flake8 ${WORKSPACE}/src/repository 2>&1 | tee /test-results/flake8.log || true && \
+    \
+    echo '=== All Tests Complete ===' && \
+    echo 'Test reports available in /test-results/'"
