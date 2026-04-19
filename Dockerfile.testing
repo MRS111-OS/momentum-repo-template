@@ -33,9 +33,9 @@ RUN rosdep update && \
 
 RUN pip install --upgrade pip && \
     if [ -f src/repository/requirements.txt ]; then \
-        pip install -r src/repository/requirements.txt; \
+        pip install --break-system-packages -r src/repository/requirements.txt; \
     fi && \
-    pip install coverage
+    pip install --break-system-packages coverage
 
 # Build all packages in the workspace
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
