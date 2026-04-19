@@ -31,7 +31,7 @@ COPY . src/repository
 RUN rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y || true
 
-RUN pip install --upgrade pip && \
+RUN pip install --break-system-packages --upgrade pip && \
     if [ -f src/repository/requirements.txt ]; then \
         pip install --break-system-packages -r src/repository/requirements.txt; \
     fi && \
