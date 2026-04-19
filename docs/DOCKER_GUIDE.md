@@ -51,7 +51,7 @@ docker-compose up -d
 
 Or with interactive shell:
 ```bash
-docker-compose run --rm ros-humble-dev
+docker-compose run --rm ros-dev
 ```
 
 ### 3. **Enter the Container**
@@ -62,9 +62,12 @@ docker exec -it momentum-ros-humble bash
 
 Now inside the container:
 ```bash
-# Source ROS setup
-source /opt/ros/humble/setup.bash
-source /home/ros/ws/install/setup.bash
+# Source ROS setup (dynamic distro)
+source /opt/ros/$ROS_DISTRO/setup.bash
+source /home/ros/momentum_ws/install/setup.bash
+
+# Move to workspace root
+cd /home/ros/momentum_ws
 
 # Build packages
 colcon build
@@ -165,7 +168,7 @@ RUN apt-get update && apt-get install -y \
 → Install ROS build tools and testing libraries
 
 ```dockerfile
-COPY . src/repository
+COPY . /home/ros/momentum_ws/src/repository
 ```
 → Copy your entire repo into the container
 
@@ -239,7 +242,7 @@ docker images | grep momentum
 docker run -it momentum-test:latest bash
 
 # See what files got built
-docker run --rm momentum-test:latest ls -la /home/ros/ws/install/
+docker run --rm momentum-test:latest ls -la /home/ros/momentum_ws/install/
 ```
 
 ---
@@ -249,7 +252,7 @@ docker run --rm momentum-test:latest ls -la /home/ros/ws/install/
 ```
 Host Machine                    Docker Container
 ─────────────────────────────────────────────────
-Your Source Code       ←→  /home/ros/ws/src/repository
+Your Source Code       ←→  /home/ros/momentum_ws/src/repository
                             (volume mount)
                        
 pytest.ini             ─→   Mounted for testing
@@ -259,6 +262,10 @@ requirements.txt       ─→   Mounted + pip install
                             Colcon build tool
                             Your ROS packages
                             Test runner
+
+                            /home/ros/momentum_ws/build
+                            /home/ros/momentum_ws/install
+                            /home/ros/momentum_ws/log
                             
                             /test-results/
                             ├── pytest.log
@@ -277,15 +284,16 @@ In `.github/workflows/ci.yml`:
 ```yaml
 - name: Run Docker Tests
   run: |
-    docker build -f Dockerfile.testing -t momentum-test .
+    docker build -f Dockerfile.testing -t momentum-test:${{ env.ROS_DISTRO }} .
     docker run --rm \
       -v $(pwd)/test-results:/test-results \
-      momentum-test
+      -e ROS_DISTRO=${{ env.ROS_DISTRO }} \
+      momentum-test:${{ env.ROS_DISTRO }}
 
 - name: Upload Test Results
-  uses: actions/upload-artifact@v3
+  uses: actions/upload-artifact@v4
   with:
-    name: test-results
+    name: ros-test-results-${{ env.ROS_DISTRO }}
     path: test-results/
 ```
 
@@ -384,3 +392,13 @@ docker run --cpus="2" --memory="4g" momentum-test:latest
    - Every developer uses same Docker image
    - No environment mismatch issues
    - Consistent test results everywhere
+
+---
+
+## Background: What Happens on `docker-compose up -d`
+
+1. Compose reads `docker-compose.yml` and builds `ros-dev` using `Dockerfile`.
+2. `Dockerfile` starts from `ros:${ROS_DISTRO}`, installs build/test tools, and performs an initial `colcon build`.
+3. Compose starts container `momentum-ros-${ROS_DISTRO}` and bind-mounts your repo to `/home/ros/momentum_ws/src/repository`.
+4. Named volumes persist `/home/ros/momentum_ws/build`, `/home/ros/momentum_ws/install`, and `/home/ros/momentum_ws/log` across restarts.
+5. When you run `colcon build` and `colcon test`, only changed packages are rebuilt and test outputs are written under the workspace directories above.

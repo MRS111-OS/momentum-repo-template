@@ -118,10 +118,16 @@ docker exec -it momentum-ros-humble bash
 
 ### Build & Test
 ```bash
-cd /home/ros/ws
+cd /home/ros/momentum_ws
 colcon build
 colcon test
 ```
+
+Workspace path map (inside container):
+- Repository source: `/home/ros/momentum_ws/src/repository`
+- Build artifacts: `/home/ros/momentum_ws/build`
+- Install artifacts: `/home/ros/momentum_ws/install`
+- Colcon logs: `/home/ros/momentum_ws/log`
 
 ---
 

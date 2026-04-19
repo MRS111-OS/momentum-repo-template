@@ -133,8 +133,8 @@ YES → CI Pipeline Starts
 │ Runner: ubuntu-22.04 (not ubuntu-latest)         │
 ├──────────────────────────────────────────────────┤
 │                                                  │
-│ JOB 1: Python Tests (3 versions)                 │
-│  └─ Python 3.9, 3.10, 3.11                      │
+│ JOB 1: Python Tests (1 version)                  │
+│  └─ Python 3.11                                  │
 │     pytest, coverage on ubuntu-22.04             │
 │                                                  │
 │ JOB 2: Linting                                   │
@@ -239,7 +239,7 @@ git push origin feat/...
 ROS_DISTRO=iron docker-compose up -d
 docker exec -it momentum-ros-iron bash
 
-cd /home/ros/ws
+cd /home/ros/momentum_ws
 colcon build
 colcon test
 ```

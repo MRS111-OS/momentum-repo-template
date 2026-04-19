@@ -27,6 +27,7 @@ STEP 1: LOCAL DEVELOPMENT (Your Machine)
 ├─────────────────────────────────────────────────┤
 │ $ docker-compose up -d                          │
 │ $ docker exec -it momentum-ros-humble bash      │
+│ $ cd /home/ros/momentum_ws                      │
 │ $ colcon build                                  │
 │ $ colcon test                                   │
 │ (takes 5-15 minutes first time, cached later)   │
@@ -46,24 +47,21 @@ STEP 3: GITHUB ACTIONS CI RUNS AUTOMATICALLY
 │                    GitHub Actions Workflow                   │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
-│  JOB 1: Python Tests (3 parallel)          (3-5 min)        │
-│  ├─ Python 3.9:  pytest + coverage                         │
-│  ├─ Python 3.10: pytest + coverage                         │
-│  └─ Python 3.11: pytest + coverage                         │
+│  JOB 1: Python Tests (1 runner)             (2-5 min)       │
+│  └─ Python 3.11: pytest + coverage                          │
 │                                                              │
 │  JOB 2: Linting (1 runner)                 (1-2 min)        │
 │  ├─ flake8 src/                                             │
 │  ├─ black --check src/                                      │
 │  └─ isort --check-only src/                                 │
 │                                                              │
-│  JOB 3: ROS Humble Docker Tests (1 runner) (10-20 min)      │
-│  ├─ Build Docker image                                      │
-│  ├─ Run container                                           │
-│  ├─ colcon build                                            │
-│  ├─ colcon test                                             │
-│  ├─ pytest (if Python tests exist)                          │
-│  ├─ ament_flake8 (ROS style)                                │
-│  └─ Generate reports                                        │
+│  JOB 3: ROS Docker Tests (matrix)          (10-20 min)      │
+│  ├─ ROS Humble: build image + run full test container       │
+│  ├─ ROS Jazzy:  build image + run full test container       │
+│  ├─ colcon build + colcon test                              │
+│  ├─ pytest + coverage.xml                                   │
+│  ├─ ament_flake8 (report only)                              │
+│  └─ Upload artifacts: ros-test-results-<distro>             │
 │                                                              │
 │  ALL JOBS PASS? ✓ Green checkmark on PR                    │
 │  ANY JOB FAIL?  ✗ Red X on PR (must fix)                   │
@@ -109,7 +107,7 @@ docker-compose up -d
 docker exec -it momentum-ros-humble bash
 
 # Inside container
-cd /home/ros/ws
+cd /home/ros/momentum_ws
 colcon build
 colcon test
 
@@ -123,8 +121,8 @@ colcon test
 # Exit Docker, check Python code quality on host
 docker exec -it momentum-ros-humble bash -c "\
   source ~/.bashrc && \
-  ament_flake8 src/repository/src/my_sensor_driver.py && \
-  ament_black --check src/repository"
+  ament_flake8 /home/ros/momentum_ws/src/repository/src/my_sensor_driver.py && \
+  ament_black --check /home/ros/momentum_ws/src/repository"
 
 # All pass: ✓
 ```
@@ -141,9 +139,9 @@ git push origin feat/thermal-sensor
 
 **Your PR shows:**
 ```
- ✓ python-tests (all 3 versions passed)
+ ✓ python-tests (Python 3.11 passed)
  ✓ lint (black, flake8, isort passed)
- ✓ ros-humble-tests (colcon build, tests, coverage all passed)
+ ✓ ros-tests / humble and ros-tests / jazzy passed
 ```
 
 Timeline:
@@ -204,6 +202,7 @@ black src/
 ```bash
 docker-compose up -d
 docker exec -it momentum-ros-humble bash
+cd /home/ros/momentum_ws
 colcon build && colcon test
 ```
 **Time:** 5-15 minutes (first time), 2-5 min (cached)
@@ -215,9 +214,9 @@ colcon build && colcon test
 **When:** Every push/PR
 **Runs:** Automatically
 **Tests:** 
-- Python 3.9, 3.10, 3.11 (sequential)
+- Python 3.11
 - Code quality (black, flake8, isort)
-- ROS Humble full build + tests
+- ROS Humble and Jazzy full Docker build + tests
 **Time:** 20-30 minutes total
 **Output:** Green ✓ or Red ✗ on PR
 **Cost:** Free (GitHub included)
@@ -232,7 +231,7 @@ Your Push to feat/my-feature
 GitHub Actions Triggered
          ↓
 ┌─────────────────────────────────────┐
-│ Python Tests (3 versions)           │
+│ Python Tests (3.11)                 │
 ├─────────────────────────────────────┤
 │ pytest tests/ -v --cov=src          │
 │ • Unit tests                        │
@@ -249,9 +248,9 @@ GitHub Actions Triggered
 └─────────────────────────────────────┘
          ↓
 ┌─────────────────────────────────────┐
-│ ROS Humble Build & Test             │
+│ ROS Matrix Build & Test             │
 ├─────────────────────────────────────┤
-│ • Ubuntu 22.04 + ROS Humble         │
+│ • Ubuntu 22.04 + ROS Humble/Jazzy   │
 │ • colcon build                      │
 │ • colcon test                       │
 │ • ament_flake8 (ROS style)          │
@@ -272,7 +271,7 @@ GitHub Actions Triggered
        GitHub Actions starts automatically
        └─ You don't have to do anything
 
-9:02 - Python tests running in parallel (3.9, 3.10, 3.11)
+9:02 - Python tests running (3.11)
 9:05 - Lint checks running
 9:07 - Docker image building
 9:12 - ROS compilation
@@ -341,9 +340,9 @@ What to do:
 
 ### For Python Tests
 ```yaml
-# Current: Tests run on 3 versions sequentially (5 min)
-# Option 1: Skip one version (saves 2 min)
-python-version: ['3.10', '3.11']  # Skip 3.9
+# Current: Tests run on Python 3.11 only
+# Option 1: Add matrix if you want broader compatibility checks
+python-version: ['3.10', '3.11']
 
 # Option 2: Parallelize tests (if you have many)
 pytest -n auto tests/
@@ -374,11 +373,10 @@ wait
 
 On your PR:
 ```
-✓ python-tests / Python 3.9
-✓ python-tests / Python 3.10
 ✓ python-tests / Python 3.11
 ✓ lint
-✗ ros-humble-tests  ← Click this to see error
+✗ ros-tests / humble  ← Click this to see error
+✗ ros-tests / jazzy   ← Or this one
 ```
 
 ### Download Artifacts
@@ -386,7 +384,8 @@ On your PR:
 After CI runs (even if it fails):
 ```
 Artifacts
-└─ ros-test-results
+├─ ros-test-results-humble
+└─ ros-test-results-jazzy
    ├─ pytest.log
    ├─ colcon-test.log
    ├─ coverage.xml
@@ -423,6 +422,7 @@ pytest tests/ -v
 # Option B: Full ROS
 docker-compose up -d
 docker exec -it momentum-ros-humble bash
+cd /home/ros/momentum_ws
 ```
 
 **Step 3: Read docs**
@@ -439,6 +439,7 @@ git checkout -b feat/my-first-feature
 ```bash
 docker-compose up -d
 docker exec -it momentum-ros-humble bash
+cd /home/ros/momentum_ws
 colcon build && colcon test
 ```
 
@@ -485,5 +486,31 @@ pytest tests/ -v --cov=src
 # Full ROS
 docker-compose up -d
 docker exec -it momentum-ros-humble bash
+cd /home/ros/momentum_ws
 colcon build && colcon test
 ```
+
+---
+
+## Behind the Scenes: Option B (Docker ROS)
+
+When you run local Option B, this is the exact order:
+
+1. `docker-compose up -d`
+  - Builds image from `Dockerfile` with `ROS_DISTRO` (default `humble`).
+  - Starts container `momentum-ros-${ROS_DISTRO}`.
+  - Mounts your repo to `/home/ros/momentum_ws/src/repository`.
+  - Reuses named volumes for `/home/ros/momentum_ws/build`, `/home/ros/momentum_ws/install`, and `/home/ros/momentum_ws/log`.
+
+2. `docker exec -it momentum-ros-humble bash`
+  - Opens an interactive shell in the running container.
+
+3. `cd /home/ros/momentum_ws && colcon build`
+  - Builds packages discovered under `src/`.
+  - Writes incremental artifacts to `build/` and `install/`.
+
+4. `colcon test`
+  - Runs package tests and stores logs/results under workspace log/build paths.
+  - You can inspect summary with `colcon test-result --verbose`.
+
+CI uses `Dockerfile.testing` (not `Dockerfile`) and runs the same pattern in one-shot containers per distro (`humble`, `jazzy`) with reports exported to `test-results/`.
