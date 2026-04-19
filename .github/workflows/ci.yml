@@ -10,32 +10,36 @@ permissions:
   contents: read
 
 env:
-  ROS_DISTRO: humble  # Options: humble, iron, jazzy
-  UBUNTU_VERSION: "22.04"
+  ROS_TEST_MODE: "colcon-test"  # Options: colcon-test | launch
+  # ROS_LAUNCH_COMMAND: "ros2 launch my_robot_pkg bringup.launch.py"
+  # ROS_LAUNCH_DURATION_SECONDS: "30"
+  # Note: Each ROS distro uses its official Docker image with correct Ubuntu version
+  #   - ros:humble → Ubuntu 22.04
+  #   - ros:jazzy → Ubuntu 24.04
 
 jobs:
   python-tests:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
-    
-     - name: Set up Python 3.11
-      uses: actions/setup-python@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
       with:
-         python-version: '3.11'
-    
+        python-version: '3.11'
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-cov
-    
+
     - name: Run Python tests
       run: |
         pytest tests/ -v --cov=src --cov-report=xml
-    
+
     - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         files: ./coverage.xml
         flags: python-tests
@@ -46,62 +50,73 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
-    
+        python-version: '3.11'
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install flake8 black isort
-    
+
     - name: Lint with flake8
       run: |
         # Stop on errors, warn on style issues
         flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
-    
+
     - name: Check code formatting with black
       run: |
         black --check src/ tests/
-    
+
     - name: Check import sorting with isort
       run: |
         isort --check-only src/ tests/
 
   ros-tests:
     runs-on: ubuntu-22.04
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        ros-distro: [humble, jazzy]
+    env:
+      ROS_DISTRO: ${{ matrix.ros-distro }}
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    
+      uses: docker/setup-buildx-action@v3
+
     - name: Build ROS ${{ env.ROS_DISTRO }} test image
       run: |
         docker build -f Dockerfile.testing \
           --build-arg ROS_DISTRO=${{ env.ROS_DISTRO }} \
           -t momentum-test:${{ env.ROS_DISTRO }} .
-    
+
     - name: Create test results directory
       run: mkdir -p test-results
-    
+
     - name: Run ROS tests in Docker
       run: |
         docker run --rm \
           -v $(pwd)/test-results:/test-results \
+          -e ROS_DISTRO=${{ env.ROS_DISTRO }} \
+          -e ROS_TEST_MODE=${{ env.ROS_TEST_MODE }} \
+          -e ROS_LAUNCH_COMMAND="${{ env.ROS_LAUNCH_COMMAND || '' }}" \
+          -e ROS_LAUNCH_DURATION_SECONDS="${{ env.ROS_LAUNCH_DURATION_SECONDS || '30' }}" \
           momentum-test:${{ env.ROS_DISTRO }}
-    
+
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
+        if-no-files-found: warn
         name: ros-test-results-${{ env.ROS_DISTRO }}
         path: test-results/
         retention-days: 30
-    
+
     - name: Display test summary
       if: always()
       run: |
