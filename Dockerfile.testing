@@ -31,11 +31,13 @@ COPY . src/repository
 RUN rosdep update && \
     rosdep install --from-paths src --ignore-src -r -y || true
 
-RUN pip install --break-system-packages --force-reinstall --upgrade pip && \
+RUN PIP_FLAGS="" && \
+    if [ "$ROS_DISTRO" = "jazzy" ]; then PIP_FLAGS="--break-system-packages"; fi && \
+    pip install $PIP_FLAGS --force-reinstall --upgrade pip && \
     if [ -f src/repository/requirements.txt ]; then \
-        pip install --break-system-packages -r src/repository/requirements.txt; \
+        pip install $PIP_FLAGS -r src/repository/requirements.txt; \
     fi && \
-    pip install --break-system-packages coverage
+    pip install $PIP_FLAGS coverage
 
 # Build all packages in the workspace
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
