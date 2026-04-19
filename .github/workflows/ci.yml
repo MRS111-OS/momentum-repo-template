@@ -10,11 +10,12 @@ permissions:
   contents: read
 
 env:
-  ROS_DISTRO: humble  # Options: humble, iron, jazzy
-  UBUNTU_VERSION: "22.04"
   ROS_TEST_MODE: "colcon-test"  # Options: colcon-test | launch
   # ROS_LAUNCH_COMMAND: "ros2 launch my_robot_pkg bringup.launch.py"
   # ROS_LAUNCH_DURATION_SECONDS: "30"
+  # Note: Each ROS distro uses its official Docker image with correct Ubuntu version
+  #   - ros:humble → Ubuntu 22.04
+  #   - ros:jazzy → Ubuntu 24.04
 
 jobs:
   python-tests:
@@ -75,6 +76,11 @@ jobs:
 
   ros-tests:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        ros-distro: [humble, jazzy]
+    env:
+      ROS_DISTRO: ${{ matrix.ros-distro }}
 
     steps:
     - uses: actions/checkout@v4

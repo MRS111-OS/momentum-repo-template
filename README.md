@@ -2,18 +2,17 @@
 
 This repository follows a structured development workflow.
 
-## ✅ Status & Compatibility
+## CI Checks
 
-**CI badges are configured for this organization repository.**
-
-[![CI - Python](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
-[![CI - Linting](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
-[![CI - ROS](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![Python Tests](https://img.shields.io/github/actions/workflow/status/MRS111-OS/momentum-repo-template/ci.yml?branch=dev&label=Python%20Tests&logo=python&logoColor=white)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![Linting](https://img.shields.io/github/actions/workflow/status/MRS111-OS/momentum-repo-template/ci.yml?branch=dev&label=Linting&logo=githubactions&logoColor=white)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![ROS 2 Humble Build/Test](https://img.shields.io/github/actions/workflow/status/MRS111-OS/momentum-repo-template/ci.yml?branch=dev&label=ROS%202%20Humble&logo=ros&logoColor=white)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
+[![ROS 2 Jazzy Build/Test](https://img.shields.io/github/actions/workflow/status/MRS111-OS/momentum-repo-template/ci.yml?branch=dev&label=ROS%202%20Jazzy&logo=ros&logoColor=white)](https://github.com/MRS111-OS/momentum-repo-template/actions/workflows/ci.yml)
 
 | Status | Details |
 |--------|---------|
 | **Python** | 3.11 |
-| **ROS 2** | Humble (Ubuntu 22.04) |
+| **ROS 2** | Humble (Ubuntu 22.04) + Jazzy (Ubuntu 24.04) |
 | **Tests** | pytest + coverage |
 | **Code Quality** | black, flake8, isort |
 
