@@ -33,7 +33,6 @@ RUN rosdep update && \
 
 RUN PIP_FLAGS="" && \
     if [ "$ROS_DISTRO" = "jazzy" ]; then PIP_FLAGS="--break-system-packages"; fi && \
-    pip install $PIP_FLAGS --force-reinstall --upgrade pip && \
     if [ -f src/repository/requirements.txt ]; then \
         pip install $PIP_FLAGS -r src/repository/requirements.txt; \
     fi && \
