@@ -12,6 +12,9 @@ permissions:
 env:
   ROS_DISTRO: humble  # Options: humble, iron, jazzy
   UBUNTU_VERSION: "22.04"
+  ROS_TEST_MODE: "colcon-test"  # Options: colcon-test | launch
+  # ROS_LAUNCH_COMMAND: "ros2 launch my_robot_pkg bringup.launch.py"
+  # ROS_LAUNCH_DURATION_SECONDS: "30"
 
 jobs:
   python-tests:
@@ -92,6 +95,10 @@ jobs:
       run: |
         docker run --rm \
           -v $(pwd)/test-results:/test-results \
+          -e ROS_DISTRO=${{ env.ROS_DISTRO }} \
+          -e ROS_TEST_MODE=${{ env.ROS_TEST_MODE }} \
+          -e ROS_LAUNCH_COMMAND="${{ env.ROS_LAUNCH_COMMAND || '' }}" \
+          -e ROS_LAUNCH_DURATION_SECONDS="${{ env.ROS_LAUNCH_DURATION_SECONDS || '30' }}" \
           momentum-test:${{ env.ROS_DISTRO }}
 
     - name: Upload test results
