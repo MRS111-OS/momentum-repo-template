@@ -104,21 +104,23 @@ momentum-build/
 
 ### Dockerfile template
 
-_(to fill in)_
+Four stages, the same ones cyborg_ros2 uses today: `manifests` (extracts package.xml files and the .momentum-build config so dependency install can be cached against them), `builder` (compiles the workspace), `runtime` (ros-base plus the apt packages the product needs, plus the built install/ copied out of builder, nothing else), and `test` (builder plus linters, for CI and desk use, never shipped). Moving to the pipeline repo only changes what each stage reads its inputs from, docker/*.txt becomes <clone>/.momentum-build/*.txt, the four-stage structure itself doesn't change.
 
 ### Build context: how the shared Dockerfile sees product source
 
-_(to fill in)_
+The Dockerfile lives in the pipeline repo. The product's source lives wherever clone.sh checked it out, a separate directory. `docker buildx build` takes the pipeline repo as the default build context (the Dockerfile and its scripts) and the cloned product directory as a second, named context: `--build-context product=<clone-path>`. Wherever the Dockerfile needs the product's source or its .momentum-build/ files, it copies from that named context (`COPY --from=product ...`) instead of the default one. That's what lets one shared Dockerfile build a product it doesn't itself contain.
 
 #### Script Responsibilities
 - `bin/build.sh` : the only entrypoint anyone runs. Takes --product, and either --ref (clone path) or --local-path (dev path), plus --env. Its job is purely sequencing: call clone.sh to get a checked-out product tree, call identity.sh to compute source and write docker-build-info.yaml into the build context, invoke docker buildx build against the product's .momentum-build/ contract, then call registry.sh for test/push/pull as asked. It holds no logic of its own beyond orchestration. Everything else is delegated so each piece is testable alone.
 
 
-lib/clone.sh : given {product repo, checkout}, resolves the checkout to a commit, does a shallow clone, and hands back a filesystem path plus the resolved sha. This is the only place "what does main mean right now" gets answered, resolved once, then treated as fixed for the rest of the run. For --local-path, it skips the clone and instead checks whether the tree has uncommitted changes, since dev builds are the one path allowed to have them.
+- `lib/clone.sh` : given {product repo, checkout}, resolves the checkout to a commit, does a shallow clone, and hands back a filesystem path plus the resolved sha. This is the only place "what does main mean right now" gets answered, resolved once, then treated as fixed for the rest of the run. For --local-path, it skips the clone and instead checks whether the tree has uncommitted changes, since dev builds are the one path allowed to have them.
 
-lib/identity.sh : pure computation, no side effects on the registry. Reads the resolved commit and checkout value from clone.sh, and the product's .momentum-build/product.env, and writes docker-build-info.yaml into the build context so the Dockerfile can copy it into the image. Also derives the tag names (the immutable version tag and the moving env tag) from the same inputs, so build.sh and registry.sh use the same tag string without the naming logic living in two places.
+- `lib/identity.sh` : pure computation, no side effects on the registry. Reads the resolved commit and checkout value from clone.sh, and the product's .momentum-build/product.env, and writes docker-build-info.yaml into the build context so the Dockerfile can copy it into the image. Also derives the tag name (`<env>-<product>-<feature-or-date>`, see Tag scheme below) from the same inputs, so build.sh and registry.sh use the same tag string without the naming logic living in two places.
 
-Shape of docker-build-info.yaml:
+- `lib/registry.sh` : thin wrapper around docker login/push/pull, plus the tag rules: refuses to push a dev image, refuses to push a build that has uncommitted changes. The script itself is complete and ready to use, it just has nothing to point at yet. It stays dormant until an actual registry is live. dev and test builds don't need it, those images never leave the machine that built them.
+
+#### Shape of docker-build-info.yaml:
 
 ```yaml
 product: cyborg_ros2
@@ -130,11 +132,10 @@ packages:
   - laser_merger2
   - cyborg_bringup
 env: test
-image_tag: v0.3.1-2-g9f2a1c3
+image_tag: test-cyborg_ros2-fix_issue_13
 built_at: 2026-09-08T19:40:00Z
 ```
 
-lib/registry.sh : thin wrapper around docker login/push/pull, plus the tag rules: refuses to push a dev image, refuses to push a build that has uncommitted changes. The script itself is complete and ready to use, it just has nothing to point at yet. It stays dormant until an actual registry is live. dev and test builds don't need it, those images never leave the machine that built them.
 
 **Why this needs an actual registry, not a server or a cloud drive standing in for one**
 
@@ -162,15 +163,39 @@ Usage:
 
 ### CLI commands in scope
 
-_(to fill in — --checkout accepting a branch, tag, or commit interchangeably; whether login/version are in scope alongside build/test/push/pull)_
+`build.sh` supports six commands: `build`, `test`, `push`, `pull`, `login`, and `version` — matching image.sh's existing surface so nothing is lost in the generalization.
+
+`--checkout` accepts a branch name, a tag, or a commit sha interchangeably, whatever `git checkout` would accept. It gets resolved to a commit once, by clone.sh, and that resolved commit, not the string that was passed, is what ends up in docker-build-info.yaml.
+
+`login` is registry login, not git. It stores a credential the same way `docker login` always has, interactively, so nothing lands in shell history or a script argument. It has nothing to do with the credential clone.sh uses to check out the product repo, that's a separate concern this proposal doesn't specify.
+
+`version` prints the tag a build would use without building anything, for checking what a given {product, checkout, env} would resolve to before spending the time to build it.
 
 ### Tag scheme
 
-_(to fill in)_
+One tag per image: `<env>-<product>-<feature-or-date>`.
+
+The last part depends on what's being built. Building off a feature or fix branch uses a slug of the branch name, for example checkout `fix/issue-13` on `cyborg_ros2` for `test` gives:
+
+```
+test-cyborg_ros2-fix_issue_13
+```
+
+Building off `main` or a release uses the build date instead, since there's no single feature name to point to:
+
+```
+prod-cyborg_ros2-20260908
+```
+
+Pushing again under the same tag overwrites what it points to — rebuilding the same feature branch after a new commit moves the tag forward, the same way a branch itself moves forward. The tag is a convenient way to address an image when pulling, it is not the record of what's actually in it. That record is `docker-build-info.yaml`, already defined above: `resolved_commit` is fixed the moment an image is built and never changes no matter how many times the tag gets reused. Anyone who needs to know exactly what a running image is should read that file, not infer it from the tag.
 
 ### Test environment
 
-_(to fill in — what --env test produces differently from prod)_
+`--env test` builds the Dockerfile's `test` stage instead of `runtime`, builder plus linters, and runs `colcon test` after the build. Lint is advisory (`ci/lint.sh` always exits 0 today, matching cyborg_ros2), colcon test does gate the build (`--return-code-on-test-failure`, so a failing test fails the build).
+
+One limitation carries over rather than gets fixed here: cyborg_ros2 currently has no tests in any of its packages, so `colcon test` finds nothing to run and reports success. A green test build today proves the image builds and lints cleanly, nothing more. Writing real tests is product-repo work, tracked separately, not something the pipeline repo can do on the product's behalf.
+
+Test images are never pushed.
 
 ### Runtime configuration
 
@@ -181,7 +206,7 @@ These per-robot values come in two shapes: scalars and files.
 **Scalars** are single values, passed as environment variables. They come from a `.env` file that lives on the robot itself, next to the compose file, and is never checked into any repo. Compose reads it automatically and substitutes it into the YAML. Shape:
 
 ```
-IMAGE=registry.example.com/cyborg/cyborg_ros2:v0.1.0-3-gabc1234
+IMAGE=registry.example.com/cyborg_ros2:prod-cyborg_ros2-20260908
 ROS_DOMAIN_ID=0
 ```
 
@@ -232,4 +257,11 @@ run together as `docker compose -f templates/compose/base.yml -f <product>/.mome
 
 ## Rollout
 
-_(to fill in)_
+Four stages, each gated on the previous one passing:
+
+1. **Design proposal acceptance** — 2 days.
+2. **Repo creation** — 2 days. Scaffold `momentum-build`: `bin/build.sh` and `lib/*.sh`, `templates/ros2/Dockerfile` and `templates/compose/base.yml`, `registry.env.example`. Most of this is extraction from cyborg_ros2's existing docker/ setup, not new code.
+3. **POC run on cyborg_ros2** — 1 week. Add the `.momentum-build/` contract to cyborg_ros2, wire build.sh end to end, prove the pipeline builds, tags, and produces a correct docker-build-info.yaml. Proving push/pull as part of parity needs a live registry, per the registry note above, this stage is blocked on that being ready rather than on anything in this stage's own scope.
+4. **Test run on pixel_ros2** — 1 week. Same bar as stage 3. pixel_ros2 has no .momentum-build/ contract yet, so this is where one gets written for the first time, confirming the pipeline generalizes rather than only working against cyborg_ros2.
+
+**POC complete** once stage 4 passes. Retiring image.sh, scaffolding momentum-repo-template, and any product beyond these two are separate decisions, not part of this rollout.
