@@ -80,9 +80,12 @@ Shape of product.env:
 IMAGE_NAME=cyborg_ros2
 ROS_DISTRO=humble
 WS_INSTALL=/opt/cyborg
+SUBMODULES=false
 ```
 
 Note: For cyborg_ros2, this is entirely just a moving operation, and not a rewrite as it already separates these inputs into the named files read by relative path (`ci/custom_packages.txt`, `docker/runtime_source_packages.txt`, etc) rather than hardcoding them in the Dockerfile, that is one of the reasons why this generalizes easily. 
+
+Whether a product's checkout needs submodules is part of this same contract, not something the pipeline repo decides on its own. `clone.sh` reads `SUBMODULES` from `product.env` after the initial clone and, if set, runs `git submodule update --init --recursive` before handing the tree back. This keeps "getting the right code into the env" true for products that use submodules without the pipeline repo having to know which ones do.
 
 ### Proposed Repo Layout (`momentum-build-pipeline`)
 
