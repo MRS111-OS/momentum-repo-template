@@ -33,10 +33,10 @@ Development of a centralised repository which handles
 - Docker compose files share a common base template, only the genuinely specific settings such as product configs, product env variables are override.
 - Lightweight
 - Version controlled so any new feature or product is added, it should reflect the repo's ability to build such an image.
+- Multi-arch (amd64/arm64) images from the POC, so pixel_ros2's Raspberry Pi target builds without a follow-up phase.
 
 ## Non goals
 - Non ROS build systems are not supported for the POC, can be done as the next step.
-- Multi-arch builds 
 - Retiring cyborg_ros2/docker/image.sh. The POC proves a parity against such image and removing and moving to the centralised build pipeline is a separate discussion. 
 
 
@@ -109,6 +109,10 @@ Four stages, the same ones cyborg_ros2 uses today: `manifests` (extracts package
 ### Build context: how the shared Dockerfile sees product source
 
 The Dockerfile lives in the pipeline repo. The product's source lives wherever clone.sh checked it out, a separate directory. `docker buildx build` takes the pipeline repo as the default build context (the Dockerfile and its scripts) and the cloned product directory as a second, named context: `--build-context product=<clone-path>`. Wherever the Dockerfile needs the product's source or its .momentum-build/ files, it copies from that named context (`COPY --from=product ...`) instead of the default one. That's what lets one shared Dockerfile build a product it doesn't itself contain.
+
+### Multi-arch builds
+
+`--platform` is a `build.sh` flag, passed straight through to `docker buildx build`. `product.env` sets the default for a product (`linux/amd64` for cyborg_ros2, `linux/amd64,linux/arm64` for pixel_ros2), and `--platform` on the command line overrides it for a one-off build. Buildx cross-builds `linux/arm64` on an `amd64` runner through QEMU emulation once the `binfmt` handler is registered on the build machine, so the POC doesn't need a separate ARM build host. A multi-platform build produces one manifest list per tag, so a robot's `docker pull` resolves to its own architecture automatically and the tag scheme is unaffected. `docker-build-info.yaml` gains a `platforms` field listing what was built.
 
 #### Script Responsibilities
 - `bin/build.sh` : the only entrypoint anyone runs. Takes --product, and either --ref (clone path) or --local-path (dev path), plus --env. Its job is purely sequencing: call clone.sh to get a checked-out product tree, call identity.sh to compute source and write docker-build-info.yaml into the build context, invoke docker buildx build against the product's .momentum-build/ contract, then call registry.sh for test/push/pull as asked. It holds no logic of its own beyond orchestration. Everything else is delegated so each piece is testable alone.
@@ -262,6 +266,6 @@ Four stages, each gated on the previous one passing:
 1. **Design proposal acceptance** — 2 days.
 2. **Repo creation** — 2 days. Scaffold `momentum-build`: `bin/build.sh` and `lib/*.sh`, `templates/ros2/Dockerfile` and `templates/compose/base.yml`, `registry.env.example`. Most of this is extraction from cyborg_ros2's existing docker/ setup, not new code.
 3. **POC run on cyborg_ros2** — 1 week. Add the `.momentum-build/` contract to cyborg_ros2, wire build.sh end to end, prove the pipeline builds, tags, and produces a correct docker-build-info.yaml. Proving push/pull as part of parity needs a live registry, per the registry note above, this stage is blocked on that being ready rather than on anything in this stage's own scope.
-4. **Test run on pixel_ros2** — 1 week. Same bar as stage 3. pixel_ros2 has no .momentum-build/ contract yet, so this is where one gets written for the first time, confirming the pipeline generalizes rather than only working against cyborg_ros2.
+4. **Test run on pixel_ros2** — 1 week. Same bar as stage 3, plus proving the `linux/arm64` build actually boots on a Raspberry Pi, not just that it builds. pixel_ros2 has no .momentum-build/ contract yet, so this is where one gets written for the first time, confirming the pipeline generalizes rather than only working against cyborg_ros2.
 
 **POC complete** once stage 4 passes. Retiring image.sh, scaffolding momentum-repo-template, and any product beyond these two are separate decisions, not part of this rollout.
